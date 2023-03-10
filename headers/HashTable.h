@@ -1,12 +1,9 @@
 #if !defined(HASH_TABLE_H)
 #define HASH_TABLE_H
 
-#include <stdlib.h>
+#include "main.h"
 
-typedef struct Range {
-    size_t start;
-    size_t end;
-} Range;
+#include <stdlib.h>
 
 typedef struct HashTableItem {
     int isBusy;
