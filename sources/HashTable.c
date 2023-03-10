@@ -59,7 +59,7 @@ Range* HashTable_get(HashTable* table, char* key) {
 
 void HashTable_clear(HashTable* table) {
     table->values = 0;
-    memset(table->valueBuffer, 0, table->valueBufferSize);
+    memset(table->valueBuffer, '\0', table->valueBufferSize);
 }
 
 void HashTable_initIterator(HashTable* table, Iterator* iterator) {

@@ -38,7 +38,7 @@ int main(void) {
         .sin_addr = {
             .s_addr = htonl(INADDR_ANY),
         },
-        .sin_port = htons(2020),
+        .sin_port = htons(2000),
     };
 
     if(bind(mainSocket, (struct sockaddr*)&addr, sizeof(addr)) < 0) return 1;
@@ -50,11 +50,14 @@ int main(void) {
     socklen_t incomingAddressLength;
 
     char requestBuffer[2048];
+    memset(requestBuffer, 0, sizeof(requestBuffer));
+
     HashTableItem headersBuffer[100];
+    memset(headersBuffer, 0, sizeof(headersBuffer));
+
     HashTableItem paramsBuffer[100];
     memset(paramsBuffer, 0, sizeof(paramsBuffer));
-    memset(requestBuffer, 0, sizeof(requestBuffer));
-    memset(headersBuffer, 0, sizeof(headersBuffer));
+
     HashTable headers = {
         .keysBuffer = requestBuffer,
         .keysBufferLength = sizeof(requestBuffer),
@@ -91,6 +94,7 @@ int main(void) {
         if(!(contentLength = Request_getHeader(&request, "Content-Length"))) {
             write(incomingSocket, "HTTP/1.1 400 Bad Request\nContent-Type: text/plain\nContent-Length: 26\n\nNo Content-Length provided", 96);
             close(incomingSocket);
+            Request_reset(&request);
             continue;
         }
 
@@ -100,6 +104,7 @@ int main(void) {
         if(contentLengthParsed != payloadLength) {
             write(incomingSocket, "HTTP/1.1 400 Bad Request\nContent-Type: text/plain\nContent-Length: 20\n\nWrong Content Length", 90);
             close(incomingSocket);
+            Request_reset(&request);
             continue;
         }
 
@@ -114,15 +119,32 @@ int main(void) {
             ? "PATCH"
             : "DELETE";
 
+        printf("## Method: %s\n", methodString);
         printf("## Original URL: ");
         printRange(request.buffer, request.originalUrl.start, request.originalUrl.end);
         printf("\n");
-        printf("## Method: %s\n", methodString);
-        printf("## Headers: %zu\n", request.headers->values);
+
+        printf("## Path: ");
+        printRange(request.buffer, request.path.start, request.path.end);
+        printf("\n");
 
         Iterator iterator;
-        HashTable_initIterator(&headers, &iterator);
         HashTableItem* item;
+
+        if(request.params->values > 0) {
+            printf("## Params: %zu\n", request.params->values);
+            HashTable_initIterator(request.params, &iterator);
+            while((item = Iterator_next(&iterator))) {
+                printf("### ");
+                printRange(request.buffer, item->key.start, item->key.end);
+                printf(": ");
+                printRange(request.buffer, item->value.start, item->value.end);
+                printf("\n");
+            }
+        }
+
+        printf("## Headers: %zu\n", request.headers->values);
+        HashTable_initIterator(request.headers, &iterator);
         while((item = Iterator_next(&iterator))) {
             printf("### ");
             printRange(request.buffer, item->key.start, item->key.end);
@@ -142,13 +164,13 @@ int main(void) {
 
         if(payloadLength > 0) {
             char* body = Request_getPayload(&request);
-            write(incomingSocket, "HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: ", 57);
+            write(incomingSocket, "HTTP/1.1 200 OK\nContent-Type: text/plain\nConnection: close\nContent-Length: ", 75);
             write(incomingSocket, contentLength, strlen(contentLength));
             write(incomingSocket, "\n\n", 2);
             write(incomingSocket, body, strlen(body));
             free(body);
         } else {
-            write(incomingSocket, "HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: 7\n\nHi Mom!", 67);
+            write(incomingSocket, "HTTP/1.1 200 OK\nContent-Type: text/plain\nConnection: close\nContent-Length: 7\n\nHi Mom!", 85);
         }
         
         Request_reset(&request);
