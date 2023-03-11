@@ -166,7 +166,7 @@ char* Request_getPayload(Request* request) {
 }
 
 void Request_reset(Request* request) {
-    memset(request->buffer, '\0', request->bufferSize);
+    memset(request->buffer, 0, request->bufferSize);
     HashTable_clear(request->headers);
     HashTable_clear(request->params);
 
