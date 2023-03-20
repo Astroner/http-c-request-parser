@@ -10,6 +10,12 @@ typedef struct Range {
 
 char* extractRange(char* buffer, size_t start, size_t end);
 
-void printRange(char* buffer, size_t start, size_t end);
+typedef enum PrintRangeMode {
+    PrintRangeModeDefault,
+    PrintRangeModeWithCodes,
+    PrintRangeModeCodesOnly,
+} PrintRangeMode;
+
+void printRange(char* buffer, size_t start, size_t end, PrintRangeMode mode);
 
 #endif // MAIN_H

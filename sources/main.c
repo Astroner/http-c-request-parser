@@ -20,13 +20,25 @@ char* extractRange(char* buffer, size_t start, size_t end) {
     return str;
 }
 
-void printRange(char* buffer, size_t start, size_t end) {
+void printRange(char* buffer, size_t start, size_t end, PrintRangeMode mode) {
     for(size_t i = start; i <= end; i++) {
-        printf("%c", buffer[i]);
+        switch(mode) {
+            case PrintRangeModeDefault:
+                printf("%c", buffer[i]);
+                break;
+            case PrintRangeModeWithCodes:
+                printf("%c(%d)", buffer[i], buffer[i]);
+                break;
+            case PrintRangeModeCodesOnly:
+                if(buffer[i] == 13 || buffer[i] == 10) printf("\n");
+                printf("%d_", buffer[i]);
+                if(buffer[i] == 13 || buffer[i] == 10) printf("\n");
+                break;
+        }
     }
 }
 
-int main(void) {
+int initSocket(uint16_t port, int listenQueueSize) {
     int mainSocket = socket(
         AF_INET,
         SOCK_STREAM,
@@ -38,142 +50,79 @@ int main(void) {
         .sin_addr = {
             .s_addr = htonl(INADDR_ANY),
         },
-        .sin_port = htons(2000),
+        .sin_port = htons(port),
     };
 
-    if(bind(mainSocket, (struct sockaddr*)&addr, sizeof(addr)) < 0) return 1;
+    if(bind(mainSocket, (struct sockaddr*)&addr, sizeof(addr)) < 0) return -1;
 
-    if(listen(mainSocket, 3) < 0) return 2;
+    if(listen(mainSocket, listenQueueSize) < 0) return -2;
+
+    return mainSocket;
+}
+
+int main(void) {
+
+    int mainSocket = initSocket(2020, 3);
+
+    if(mainSocket < 0) {
+        printf("Failed to init socket (%d)\n", mainSocket);
+        return 1;
+    }
 
     int incomingSocket;
     struct sockaddr_in incomingAddress;
     socklen_t incomingAddressLength;
 
-    char requestBuffer[2048];
-    memset(requestBuffer, 0, sizeof(requestBuffer));
-
-    HashTableItem headersBuffer[100];
-    memset(headersBuffer, 0, sizeof(headersBuffer));
-
-    HashTableItem paramsBuffer[100];
-    memset(paramsBuffer, 0, sizeof(paramsBuffer));
-
-    HashTable headers = {
-        .keysBuffer = requestBuffer,
-        .keysBufferLength = sizeof(requestBuffer),
-
-        .valueBuffer = headersBuffer,
-        .valueBufferSize = sizeof(headersBuffer) / sizeof(HashTableItem),
-    };
-
-    HashTable params = {
-        .keysBuffer = requestBuffer,
-        .keysBufferLength = sizeof(requestBuffer),
-
-        .valueBuffer = paramsBuffer,
-        .valueBufferSize = sizeof(paramsBuffer) / sizeof(HashTableItem),
-    };
-
-    Request request = {
-        .buffer = requestBuffer,
-        .bufferSize = sizeof(requestBuffer),
-        .headers = &headers,
-        .params = &params,
-    };
+    createStaticRequest(request, 2048, 100, 100);
 
     while(1) {
         if((incomingSocket = accept(mainSocket, (struct sockaddr*)&incomingAddress, &incomingAddressLength)) < 0) return 3;
 
-        printf("# New Request\n");
+        printf("# New Request:\n");
         int status;
-        if((status = Request_parseSocket(incomingSocket, &request)) < 0) {
-            printf("Failed to parse request: %d\n", status);
+        if((status = Request_parseSocket(incomingSocket, request)) < 0) {
+            printf("Failed to parse request: (%d)\n", status);
+            printRange(request->buffer, 0, request->dataLength, PrintRangeModeDefault);
+            write(incomingSocket, "HTTP/1.1 400 Bad Request\n\r\n", 27);
+            Request_reset(request);
+            close(incomingSocket);
+
+            continue;
         };
+        Request_print(request);
+
+        size_t payloadLength = request->dataLength - request->payloadStartIndex;
 
         char* contentLength;
-        if(!(contentLength = Request_getHeader(&request, "Content-Length"))) {
+        if(!(contentLength = Request_getHeader(request, "Content-Length")) && payloadLength) {
+            printf("## Response: 400\n");
             write(incomingSocket, "HTTP/1.1 400 Bad Request\nContent-Type: text/plain\nContent-Length: 26\n\nNo Content-Length provided", 96);
             close(incomingSocket);
-            Request_reset(&request);
+            Request_reset(request);
             continue;
         }
-
-        size_t contentLengthParsed = atol(contentLength);
-        size_t payloadLength = request.dataLength - request.payloadStartIndex;
+        
+        size_t contentLengthParsed = contentLength ? atol(contentLength) : payloadLength;
 
         if(contentLengthParsed != payloadLength) {
+            printf("## Response: 400\n");
             write(incomingSocket, "HTTP/1.1 400 Bad Request\nContent-Type: text/plain\nContent-Length: 20\n\nWrong Content Length", 90);
             close(incomingSocket);
-            Request_reset(&request);
+            Request_reset(request);
             continue;
         }
-
-        char* methodString = 
-            request.method == RequestMethodGet
-            ? "GET"
-            : request.method == RequestMethodPost
-            ? "POST"
-            : request.method == RequestMethodPut
-            ? "PUT"
-            : request.method == RequestMethodPatch
-            ? "PATCH"
-            : "DELETE";
-
-        printf("## Method: %s\n", methodString);
-        printf("## Original URL: ");
-        printRange(request.buffer, request.originalUrl.start, request.originalUrl.end);
-        printf("\n");
-
-        printf("## Path: ");
-        printRange(request.buffer, request.path.start, request.path.end);
-        printf("\n");
-
-        Iterator iterator;
-        HashTableItem* item;
-
-        if(request.params->values > 0) {
-            printf("## Params: %zu\n", request.params->values);
-            HashTable_initIterator(request.params, &iterator);
-            while((item = Iterator_next(&iterator))) {
-                printf("### ");
-                printRange(request.buffer, item->key.start, item->key.end);
-                printf(": ");
-                printRange(request.buffer, item->value.start, item->value.end);
-                printf("\n");
-            }
-        }
-
-        printf("## Headers: %zu\n", request.headers->values);
-        HashTable_initIterator(request.headers, &iterator);
-        while((item = Iterator_next(&iterator))) {
-            printf("### ");
-            printRange(request.buffer, item->key.start, item->key.end);
-            printf(": ");
-            printRange(request.buffer, item->value.start, item->value.end);
-            printf("\n");
-        }
-
+        printf("## Response: 200\n");
         if(payloadLength > 0) {
-            printf("## Payload: \n");
-            printf("### Payload Length: %zu\n", payloadLength);
-            printRange(request.buffer, request.payloadStartIndex, request.dataLength);
-        } else {
-            printf("## No Payload\n");
-        }
-        printf("\n\n");
-
-        if(payloadLength > 0) {
-            char* body = Request_getPayload(&request);
+            char* body = Request_getPayload(request);
             write(incomingSocket, "HTTP/1.1 200 OK\nContent-Type: text/plain\nConnection: close\nContent-Length: ", 75);
             write(incomingSocket, contentLength, strlen(contentLength));
             write(incomingSocket, "\n\n", 2);
             write(incomingSocket, body, strlen(body));
-            free(body);
         } else {
             write(incomingSocket, "HTTP/1.1 200 OK\nContent-Type: text/plain\nConnection: close\nContent-Length: 7\n\nHi Mom!", 85);
         }
         
-        Request_reset(&request);
+        Request_reset(request);
         free(contentLength);
         close(incomingSocket);
     }
