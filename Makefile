@@ -1,3 +1,4 @@
+CC=gcc-12
 SOURCES=$(wildcard sources/*.c)
 OBJECTS=$(SOURCES:.c=.o)
 HEADERS=headers
@@ -5,13 +6,13 @@ HEADERS=headers
 EXECUTABLE=./server
 
 all: build
-	$(EXECUTABLE)
+	$(EXECUTABLE) $(EFLAGS)
 
 build: $(OBJECTS)
-	gcc -o $(EXECUTABLE) $^
+	$(CC) -o $(EXECUTABLE) $(CFLAGS) $^
 
 .c.o:
-	gcc -c -o $@ -Wall -Wextra -I$(HEADERS) $<
+	$(CC) -c -o $@ -Wall -Wextra -I$(HEADERS) $(CFLAGS) $<
 
 clean:
 	rm -f $(EXECUTABLE) $(OBJECTS)

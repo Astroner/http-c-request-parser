@@ -60,23 +60,29 @@ int initSocket(uint16_t port, int listenQueueSize) {
     return mainSocket;
 }
 
-int main(void) {
+int main(int argc, char** argv) {
+    uint16_t port = 2000;
 
-    int mainSocket = initSocket(2020, 3);
+    if(argc > 1) {
+        int arg = atoi(argv[1]);
+        if(arg > 0) port = arg;
+        else printf("# Invalid PORT argument\n");
+    }
 
+    int mainSocket = initSocket(port, 3);
+    
     if(mainSocket < 0) {
         printf("Failed to init socket (%d)\n", mainSocket);
         return 1;
     }
 
+    printf("# Server started on port %d\n", port);
+
     int incomingSocket;
-    struct sockaddr_in incomingAddress;
-    socklen_t incomingAddressLength;
 
-    createStaticRequest(request, 2048, 100, 100);
-
+    createStaticRequest(request, 2024, 100, 100);
     while(1) {
-        if((incomingSocket = accept(mainSocket, (struct sockaddr*)&incomingAddress, &incomingAddressLength)) < 0) return 3;
+        if((incomingSocket = accept(mainSocket, NULL, NULL)) < 0) return 3;
 
         printf("# New Request:\n");
         int status;
@@ -91,7 +97,7 @@ int main(void) {
         };
         Request_print(request);
 
-        size_t payloadLength = request->dataLength - request->payloadStartIndex;
+        size_t payloadLength = Request_payloadLength(request);
 
         char* contentLength;
         if(!(contentLength = Request_getHeader(request, "Content-Length")) && payloadLength) {
@@ -102,7 +108,7 @@ int main(void) {
             continue;
         }
         
-        size_t contentLengthParsed = contentLength ? atol(contentLength) : payloadLength;
+        size_t contentLengthParsed = contentLength ? (size_t)atol(contentLength) : payloadLength;
 
         if(contentLengthParsed != payloadLength) {
             printf("## Response: 400\n");
