@@ -5,9 +5,13 @@ Also Headers arrays are not implemented, but it can be easily implemented with s
 
 # Basic HTTP Request Structure:
 METHOD PATH HTTP_VERSION\r\n
+
 HEADER_1_NAME: HEADER_1_VALUE\r\n
+
 HEADER_2_NAME: HEADER_2_VALUE\r\n
+
 \r\n
+
 PAYLOAD...
 
 # Test Server
