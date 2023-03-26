@@ -1,6 +1,8 @@
 # Hi There
 This is an implementation of http request parser in C. Parser function named **Request_parseSocket()** and it doesn't use any dynamic memory.
+
 I was too lazy to handle Hash Table collisions.
+
 Also Headers arrays are not implemented, but it can be easily implemented with special collision strategy: u don't replace items with the same key, u just add another item;
 
 # Basic HTTP Request Structure:
@@ -17,8 +19,10 @@ PAYLOAD...
 # Test Server
 First u need to build stuff:
 > make build
+
 Then u can start the server:
 > ./server
+
 By default it will start on port 2000, but u can provide specific port with second parameter:
 > ./server 2020
 
