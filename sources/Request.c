@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/socket.h>
 
 #define METHOD_SIZE_LIMIT 6
 
@@ -214,7 +215,7 @@ static int parseBuffer(Request* req) {
 int Request_parseSocket(int socket, Request* result) {
     // first, we need to read data to the buffer
     // it assumes that Request object already was initialized and allocated
-    size_t dataLength = read(socket, result->buffer, result->bufferLength);
+    size_t dataLength = recv(socket, result->buffer, result->bufferLength, 0);
 
     // read() function returns the length of the content read
     result->dataLength = dataLength;

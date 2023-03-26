@@ -13,9 +13,9 @@
 char* extractRange(char* buffer, size_t start, size_t end) {
     char* str = malloc(end - start + 2);
 
-    memcpy(str, &buffer[start], end - start + 1);
+    memcpy(str, buffer + start, end - start + 1);
 
-    str[end + 1] = '\0';
+    str[end - start + 1] = '\0';
 
     return str;
 }
@@ -47,9 +47,7 @@ int initSocket(uint16_t port, int listenQueueSize) {
 
     struct sockaddr_in addr = {
         .sin_family = AF_INET,
-        .sin_addr = {
-            .s_addr = htonl(INADDR_ANY),
-        },
+        .sin_addr.s_addr = htonl(INADDR_ANY),
         .sin_port = htons(port),
     };
 
@@ -102,7 +100,7 @@ int main(int argc, char** argv) {
         char* contentLength;
         if(!(contentLength = Request_getHeader(request, "Content-Length")) && payloadLength) {
             printf("## Response: 400\n");
-            write(incomingSocket, "HTTP/1.1 400 Bad Request\nContent-Type: text/plain\nContent-Length: 26\n\nNo Content-Length provided", 96);
+            send(incomingSocket, "HTTP/1.1 400 Bad Request\nContent-Type: text/plain\nContent-Length: 26\n\nNo Content-Length provided", 96, 0);
             close(incomingSocket);
             Request_reset(request);
             continue;
@@ -112,7 +110,7 @@ int main(int argc, char** argv) {
 
         if(contentLengthParsed != payloadLength) {
             printf("## Response: 400\n");
-            write(incomingSocket, "HTTP/1.1 400 Bad Request\nContent-Type: text/plain\nContent-Length: 20\n\nWrong Content Length", 90);
+            send(incomingSocket, "HTTP/1.1 400 Bad Request\nContent-Type: text/plain\nContent-Length: 20\n\nWrong Content Length", 90, 0);
             close(incomingSocket);
             Request_reset(request);
             continue;
@@ -120,12 +118,12 @@ int main(int argc, char** argv) {
         printf("## Response: 200\n");
         if(payloadLength > 0) {
             char* body = Request_getPayload(request);
-            write(incomingSocket, "HTTP/1.1 200 OK\nContent-Type: text/plain\nConnection: close\nContent-Length: ", 75);
-            write(incomingSocket, contentLength, strlen(contentLength));
-            write(incomingSocket, "\n\n", 2);
-            write(incomingSocket, body, strlen(body));
+            send(incomingSocket, "HTTP/1.1 200 OK\nContent-Type: text/plain\nConnection: close\nContent-Length: ", 75, 0);
+            send(incomingSocket, contentLength, strlen(contentLength), 0);
+            send(incomingSocket, "\n\n", 2, 2);
+            send(incomingSocket, body, strlen(body), 2);
         } else {
-            write(incomingSocket, "HTTP/1.1 200 OK\nContent-Type: text/plain\nConnection: close\nContent-Length: 7\n\nHi Mom!", 85);
+            send(incomingSocket, "HTTP/1.1 200 OK\nContent-Type: text/plain\nConnection: close\nContent-Length: 7\n\nHi Mom!", 85, 0);
         }
         
         Request_reset(request);
