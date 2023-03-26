@@ -1,7 +1,7 @@
 # Hi There
 This is an implementation of http request parser in C. Parser function named **Request_parseSocket()** and it doesn't use any dynamic memory.
 
-I was too lazy to handle Hash Table collisions.
+I was too lazy to handle Hash Table collisions so headers and params can override each other.
 
 Also Headers arrays are not implemented, but it can be easily implemented with special collision strategy: u don't replace items with the same key, u just add another item;
 
